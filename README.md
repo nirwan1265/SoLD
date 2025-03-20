@@ -1,2 +1,2 @@
-# SoLD
-This GitHub repository contains all data, analysis, and resources related to the lipidomics study conducted on the Sorghum Association Panel.
+# Sorghum Lipidomics Database (SoLD)
+his GitHub repository contains all data, analysis, and resources related to the lipidomics study conducted on the Sorghum Association Panel. The study includes lipid profiles from both control conditions and low-input conditions, specifically low nitrogen (N), low phosphorus (P), and cold stress. The repository serves as a comprehensive resource for exploring lipidomic variations in sorghum under different environmental constraints.
