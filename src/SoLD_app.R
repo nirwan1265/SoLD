@@ -1,17 +1,27 @@
+library(shiny)
+library(shinydashboard)
+library(DT)
+library(ggplot2)
+library(dplyr)
 library(vroom)
+
+
 ## Read the files
 lowinput <- vroom("../data/lowinput_exp.csv")
 control <- vroom("../data/control_exp.csv")
 head(lowinput)
 head(control)
 
-library(shiny)
-library(shinydashboard)
-library(DT)
-library(ggplot2)
-library(dplyr)
 
+# Load RDS files
+annotation_data <- list(
+  lowinput = readRDS("../data/all_annotations_lowinput.rds"),
+  control = NULL  # Placeholder until you have control data
+)
 
+# Path to Manhattan figures
+#manhattan_dir <- "/figures/manhattans/lowinput/"
+manhattan_dir <- "/Users/nirwantandukar/Library/Mobile Documents/com~apple~CloudDocs/Github/SoLD/figures/manhattans/lowinput"
 ## If you're using prcomp, you can skip factoextra. If you want fancy visuals, use library(factoextra).
 ## If you're doing UMAP, library(umap) is also helpful.
 
@@ -30,7 +40,9 @@ ui <- dashboardPage(
       menuItem("PCA",            tabName = "pca_tab",   icon = icon("project-diagram")),
       menuItem("t-SNE / UMAP",   tabName = "tsne_tab",  icon = icon("braille")),
       menuItem("Volcano Plot",   tabName = "volcano_tab", icon = icon("fire")),
-      menuItem("Heatmap",        tabName = "heatmap_tab", icon = icon("th"))
+      menuItem("Heatmap",        tabName = "heatmap_tab", icon = icon("th")),
+      menuItem("GWAS",           tabName = "gwas_tab",    icon = icon("dna")),
+      menuItem("Gene Hits",      tabName = "gene_hits_tab", icon = icon("chart-bar"))
     )
   ),
   dashboardBody(
@@ -84,6 +96,7 @@ ui <- dashboardPage(
           )
         )
       ),
+      
       
       ##------------------------------------------------------------------
       ##  TAB 3: PCA
@@ -183,6 +196,42 @@ ui <- dashboardPage(
             plotOutput("heatmap_plot")
           )
         )
+      ),
+      
+      ##------------------------------------------------------------------
+      ##  TAB 7: GWAS
+      ##------------------------------------------------------------------
+        # GWAS tab
+        tabItem(tabName = "gwas_tab",
+                fluidRow(
+                  box(title = "GWAS Controls", width = 4, status = "primary", solidHeader = TRUE,
+                      selectInput("gwas_dataset", "Select Dataset:", choices = names(annotation_data), selected = "lowinput"),
+                      uiOutput("gwas_lipid_selector")
+                  ),
+                  box(title = "GWAS Manhattan Plot", width = 8, status = "info", solidHeader = TRUE,
+                      uiOutput("manhattan_image")
+                  )
+                ),
+                fluidRow(
+                  box(title = "GWAS Annotation Table", width = 12, status = "success", solidHeader = TRUE,
+                      DTOutput("gwas_table")
+                  )
+                )
+        ),
+      
+      ##------------------------------------------------------------------
+      ##  TAB 8: Gene Hits
+      ##------------------------------------------------------------------
+      tabItem(tabName = "gene_hits_tab",
+              fluidRow(
+                box(title = "Gene Hit Filters", width = 4, status = "primary", solidHeader = TRUE,
+                    selectInput("hit_dataset", "Select Dataset:", choices = names(annotation_data), selected = "lowinput"),
+                    selectInput("hit_threshold", "Select -log10(p) threshold:", choices = c(7, 5), selected = 7)
+                ),
+                box(title = "Top Genes by Hit Count", width = 8, status = "success", solidHeader = TRUE,
+                    DTOutput("gene_hit_table")
+                )
+              )
       )
     )
   )
@@ -277,11 +326,16 @@ server <- function(input, output, session) {
         y = "Value"
       ) +
       theme_minimal() +
+      theme_minimal(base_size = 20) +
       theme(
+        panel.grid.major = element_blank(),  # Remove major grid lines
+        panel.grid.minor = element_blank(),  # Remove minor grid lines
+        axis.line = element_line(),          # Add base axes
         axis.text.x = element_text(angle = 45, hjust = 1),
         legend.position = "none"
       )
   })
+  
   
   # 3) Combined Boxplot with Violin (Control vs LowInput)
   output$boxplot_both <- renderPlot({
@@ -318,11 +372,16 @@ server <- function(input, output, session) {
         y = "Value"
       ) +
       theme_minimal() +
+      theme_minimal(base_size = 20) +
       theme(
+        panel.grid.major = element_blank(),  # Remove major grid lines
+        panel.grid.minor = element_blank(),  # Remove minor grid lines
+        axis.line = element_line(),          # Add base axes
         axis.text.x = element_text(angle = 45, hjust = 1),
-        legend.position = "right"
+        legend.position = "none"
       )
   })
+  
   
   
   
@@ -487,6 +546,76 @@ server <- function(input, output, session) {
              show_rownames = TRUE,
              show_colnames = TRUE)
   })
+  
+  ##======================================================================
+  ##  TAB 7: GWAS
+  ##======================================================================
+  # Lipid dropdown based on dataset
+  output$gwas_lipid_selector <- renderUI({
+    req(input$gwas_dataset)
+    lipid_list <- names(annotation_data[[input$gwas_dataset]])
+    selectInput("selected_lipid", "Select Lipid:", choices = lipid_list)
+  })
+  
+  # Manhattan plot
+  output$manhattan_image <- renderUI({
+    req(input$gwas_dataset, input$selected_lipid)
+    lipid <- input$selected_lipid
+    
+    # Image path (absolute)
+    img_path <- file.path(manhattan_dir, paste0(lipid, ".jpg"))
+    
+    if (!file.exists(img_path)) {
+      return(tags$p("No Manhattan plot available for this lipid."))
+    }
+    
+    # Embed the image from the absolute path using base64 encoding
+    encoded <- base64enc::dataURI(file = img_path, mime = "image/jpeg")
+    tags$img(src = encoded, width = "100%", style = "border:1px solid #ddd; padding:10px;")
+  })
+  
+  # GWAS Table
+  output$gwas_table <- renderDT({
+    req(input$gwas_dataset, input$selected_lipid)
+    df <- annotation_data[[input$gwas_dataset]][[input$selected_lipid]]
+    validate(need(!is.null(df), "No annotation table found for this lipid."))
+    datatable(df, options = list(scrollX = TRUE, pageLength = 10))
+  })
+  
+  ##======================================================================
+  ##  TAB 8: Gene Hits
+  ##======================================================================
+  # Gene Hits Table
+  output$gene_hit_table <- renderDT({
+    req(input$hit_dataset, input$hit_threshold)
+    data_list <- annotation_data[[input$hit_dataset]]
+    threshold <- as.numeric(input$hit_threshold)
+    
+    # Combine all entries from all lipids into one table
+    combined_df <- do.call(rbind, lapply(data_list, function(df) {
+      if (!is.null(df) && all(c("GeneID", "log(p)") %in% colnames(df))) {
+        df[df$`log(p)` >= threshold, c("GeneID", "log(p)")]
+      }
+    }))
+    
+    # Count gene occurrences
+    gene_summary <- as.data.frame(table(combined_df$GeneID))
+    colnames(gene_summary) <- c("GeneID", "Occurrences")
+    
+    # Sort by highest count
+    gene_summary <- gene_summary[order(-gene_summary$Occurrences), ]
+    
+    datatable(gene_summary, options = list(scrollX = TRUE, pageLength = 10))
+  })
 }
 
 shinyApp(ui, server)
+
+
+#lipid <- "Rect_Manhtn.(-)-Caryophyllene oxide_mod_sub_remaining_lowinput1.part12_SAP_bialleles_MAF_0.05.assoc_manhattan.jpg"
+#pattern <- paste0("Rect_Manhtn.*", gsub("[\\(\\)\\+\\*\\^\\$\\.\\|\\?\\[\\]\\{\\}]", ".", lipid), ".*manhattan.jpg")
+
+
+#safe_lipid <- gsub("_mod.*", "", lipid)  # remove _mod and everything after
+#safe_lipid <- gsub("Rect_Manhtn.", ".", safe_lipid)  # escape regex symbols
+
