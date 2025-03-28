@@ -1,9 +1,9 @@
 # Load necessary libraries
-library(vroom)
-library(dplyr)
-library(CMplot)
-library(GenomicRanges)
-library(rtracklayer)
+#library(vroom)
+#library(dplyr)
+#library(CMplot)
+#library(GenomicRanges)
+#library(rtracklayer)
 
 # Set the base directory where the phenotype folders are located
 base_dir_LMM <- "/Users/nirwantandukar/Documents/Research/results/GWAS/SAP/individual/lowinput/raw_gwas"
@@ -110,7 +110,7 @@ create_manhattan_and_annotate <- function(file, ref_GRanges, output_prefix) {
 }
 
 # Load your reference GFF file - replace with the actual path
-ref_GRanges <- rtracklayer::import("/Users/nirwantandukar/Library/Mobile Documents/com~apple~CloudDocs/Research/Data/Sorghum.annotation/ensemblgenomes/Sorghum_bicolor.Sorghum_bicolor_NCBIv3.54.gff3")
+#ref_GRanges <- rtracklayer::import("/Users/nirwantandukar/Library/Mobile Documents/com~apple~CloudDocs/Research/Data/Sorghum.annotation/ensemblgenomes/Sorghum_bicolor.Sorghum_bicolor_NCBIv3.54.gff3")
 # Filter ref_GRanges for only genes
 genes_only <- ref_GRanges[mcols(ref_GRanges)$type == "gene"]
 
@@ -123,3 +123,21 @@ for (lipids in file_all) {
   create_manhattan_and_annotate(lipids, genes_only, file_name)
 }
 
+
+
+# Load the RDS file
+annotation_list <- readRDS("data/all_annotations_lowinput.rds")
+
+# Combine all GeneID values from the list
+all_genes <- unlist(lapply(annotation_list, function(df) {
+  if (!is.null(df) && "GeneID" %in% names(df)) df$GeneID else NULL
+}))
+
+# Get unique GeneIDs
+unique_genes <- as.data.frame(unique(all_genes))
+
+# Save to a text file
+write.table(unique_genes, "unique_genes_lowinput.txt",row.names = FALSE, col.names = FALSE, quote = FALSE)
+
+
+gene_annotation <- vroom("data/gene_annotation.txt", delim ="\t")

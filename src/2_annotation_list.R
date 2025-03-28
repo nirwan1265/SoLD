@@ -1,10 +1,10 @@
-library(dplyr)
-library(tidyr)
-library(purrr)
+#library(dplyr)
+#library(tidyr)
+#library(purrr)
 # Read all .txt files in a folder and combine them into a single list
 # The list will contain all the data from the .txt files
 # The list will be saved as a .rds file
-dir <- "/Users/nirwantandukar/Documents/Research/results/GWAS/SAP/SoLD/lowinput/annotation"
+dir <- "/Users/nirwantandukar/Documents/Research/results/GWAS/SAP/SoLD/control/annotation"
 files <- list.files(dir, pattern = ".txt", full.names = TRUE)
 
 # Save as list for each file
@@ -35,21 +35,22 @@ annotation_list <- setNames(
 )
 
 
-annotation_list[["TG(60:5)"]]
+annotation_list[["TG(60:4)"]]
 
 # Optional Save to RDS
-saveRDS(annotation_list, "all_annotations_lowinput.rds")
+saveRDS(annotation_list, "all_annotations_control.rds")
 
 
-
+getwd()
 
 ### RENAMING THE MANHATTAN PLOTS
 
 # Set path to your folder
-manhattan_dir <- paste0(getwd(),"/figures/manhattans/lowinput")
-getwd()
-# List all manhattan image files
-files <- list.files(manhattan_dir, pattern = "_manhattan\\.jpg$", full.names = TRUE)
+manhattan_dir <- paste0(getwd(),"/www/manhattans/control")
+
+# List all manhattan image files with jpg extension
+files <- list.files(manhattan_dir, pattern = ".jpg", full.names = TRUE)
+
 
 # Go through each file
 for (file in files) {
@@ -68,3 +69,22 @@ for (file in files) {
 }
 
 
+
+
+
+### UNIQUE genes
+# Assuming annotation_list is your named list of tibbles
+unique_genes <- as.data.frame(unique(unlist(lapply(annotation_list, \(df) df$GeneID))))
+
+# Save
+write.csv(unique_genes, "unique_genes_control.csv", row.names = FALSE)
+getwd()
+
+
+
+
+dup <- vroom("data/gene_annotation.txt")
+# Remove duplicate rows 
+dup <- distinct(dup, GeneID, .keep_all = TRUE)
+# Save
+write.table(dup, "gene_annotation_unique.txt", row.names = FALSE, sep = "\t")
